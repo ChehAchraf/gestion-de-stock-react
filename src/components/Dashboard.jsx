@@ -37,22 +37,22 @@ export default function Dashboard() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">
-                نظام إدارة المنتجات والمبيعات
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-row-reverse justify-between items-center h-16">
+            <div className="flex items-center space-x-4 space-x-reverse">
               <span className="text-sm text-gray-700">
                 مرحباً، {user?.firstName || user?.emailAddresses[0]?.emailAddress}
               </span>
               <SignOutButton>
                 <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
-                  <LogOut className="w-4 h-4 mr-2" />
+                  <LogOut className="w-4 h-4 ml-2" />
                   تسجيل الخروج
                 </button>
               </SignOutButton>
+            </div>
+            <div className="flex items-center">
+              <h1 className="text-xl font-semibold text-gray-900">
+                نظام إدارة المنتجات والمبيعات
+              </h1>
             </div>
           </div>
         </div>
@@ -75,7 +75,7 @@ export default function Dashboard() {
                         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                     }`}
                   >
-                    <Icon className="w-5 h-5 mr-3" />
+                    <Icon className="w-5 h-5 ml-3" />
                     {item.label}
                   </button>
                 )

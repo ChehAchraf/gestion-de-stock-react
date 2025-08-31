@@ -129,7 +129,7 @@ export default function SalesPage() {
           onClick={() => setShowAddModal(true)}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center"
         >
-          <Plus className="w-5 h-5 mr-2" />
+          <Plus className="w-5 h-5 ml-2" />
           تسجيل مبيعات جديدة
         </button>
       </div>
@@ -137,13 +137,13 @@ export default function SalesPage() {
       {/* Search */}
       <div className="mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
             placeholder="البحث في المنتجات..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
       </div>
@@ -153,19 +153,19 @@ export default function SalesPage() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 المنتج
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 الكمية المباعة
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 سعر الوحدة
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 السعر الإجمالي
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 تاريخ البيع
               </th>
             </tr>
@@ -220,7 +220,7 @@ export default function SalesPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center mt-6">
-          <nav className="flex space-x-2">
+          <nav className="flex space-x-2 space-x-reverse">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
@@ -280,7 +280,7 @@ export default function SalesPage() {
                     <button
                       key={product.id}
                       onClick={() => handleProductSelect(product)}
-                      className={`w-full text-left p-3 border rounded-lg transition-colors ${
+                      className={`w-full text-right p-3 border rounded-lg transition-colors ${
                         selectedProduct?.id === product.id
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
@@ -358,7 +358,7 @@ export default function SalesPage() {
                       </div>
                     )}
 
-                    <div className="flex space-x-3 pt-4">
+                    <div className="flex space-x-3 space-x-reverse pt-4">
                       <button
                         type="submit"
                         className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-md font-medium"

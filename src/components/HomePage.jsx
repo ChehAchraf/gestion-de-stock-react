@@ -98,7 +98,7 @@ export default function HomePage() {
                 <div className={`p-3 rounded-full ${stat.color} bg-opacity-10`}>
                   <Icon className={`w-6 h-6 ${stat.textColor}`} />
                 </div>
-                <div className="ml-4">
+                <div className="mr-4">
                   <p className="text-sm font-medium text-gray-600">{stat.title}</p>
                   <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                 </div>
@@ -113,15 +113,15 @@ export default function HomePage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">إجراءات سريعة</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button className="flex items-center justify-center p-4 border-2 border-blue-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors">
-            <Package className="w-6 h-6 text-blue-600 mr-2" />
+            <Package className="w-6 h-6 text-blue-600 ml-2" />
             <span className="text-blue-600 font-medium">إضافة منتج جديد</span>
           </button>
           <button className="flex items-center justify-center p-4 border-2 border-green-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors">
-            <ShoppingCart className="w-6 h-6 text-green-600 mr-2" />
+            <ShoppingCart className="w-6 h-6 text-green-600 ml-2" />
             <span className="text-green-600 font-medium">تسجيل مبيعات</span>
           </button>
           <button className="flex items-center justify-center p-4 border-2 border-purple-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors">
-            <TrendingUp className="w-6 h-6 text-purple-600 mr-2" />
+            <TrendingUp className="w-6 h-6 text-purple-600 ml-2" />
             <span className="text-purple-600 font-medium">عرض التقارير</span>
           </button>
         </div>

@@ -251,7 +251,7 @@ export default function ProductsPage() {
           onClick={() => setShowAddModal(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
         >
-          <Plus className="w-5 h-5 mr-2" />
+          <Plus className="w-5 h-5 ml-2" />
           إضافة منتج جديد
         </button>
       </div>
@@ -259,13 +259,13 @@ export default function ProductsPage() {
       {/* Search */}
       <div className="mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
             placeholder="البحث في المنتجات..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
       </div>
@@ -275,19 +275,19 @@ export default function ProductsPage() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 اسم المنتج
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 الكمية
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 السعر
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 الرقم المرجعي
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 الإجراءات
               </th>
             </tr>
@@ -328,7 +328,7 @@ export default function ProductsPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
                       onClick={() => handleEdit(product)}
-                      className="text-blue-600 hover:text-blue-900 mr-3"
+                      className="text-blue-600 hover:text-blue-900 ml-3"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
@@ -349,7 +349,7 @@ export default function ProductsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center mt-6">
-          <nav className="flex space-x-2">
+          <nav className="flex space-x-2 space-x-reverse">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
@@ -461,7 +461,7 @@ export default function ProductsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   الرقم المرجعي
                 </label>
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 space-x-reverse">
                   <input
                     type="text"
                     value={formData.reference_number}
@@ -479,7 +479,7 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div className="flex space-x-3 pt-4">
+              <div className="flex space-x-3 space-x-reverse pt-4">
                 <button
                   type="submit"
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-medium"
@@ -557,7 +557,7 @@ export default function ProductsPage() {
                 </div>
               )}
 
-              <div className="flex space-x-3 pt-4">
+              <div className="flex space-x-3 space-x-reverse pt-4">
                 <button
                   onClick={() => {
                     if (barcodeResult && barcodeResult !== 'فشل في قراءة الباركود') {
