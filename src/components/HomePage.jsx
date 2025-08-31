@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Package, ShoppingCart, TrendingUp, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
-export default function HomePage() {
+export default function HomePage({ onNavigate }) {
   const [stats, setStats] = useState({
     totalProducts: 0,
     totalSales: 0,
@@ -81,26 +81,50 @@ export default function HomePage() {
     }
   ]
 
+  const quickActions = [
+    {
+      title: 'إضافة منتج جديد',
+      icon: Package,
+      color: 'border-blue-200 hover:border-blue-300 hover:bg-blue-50',
+      textColor: 'text-blue-600',
+      action: () => onNavigate('products')
+    },
+    {
+      title: 'تسجيل مبيعات',
+      icon: ShoppingCart,
+      color: 'border-green-200 hover:border-green-300 hover:bg-green-50',
+      textColor: 'text-green-600',
+      action: () => onNavigate('sales')
+    },
+    {
+      title: 'عرض التقارير',
+      icon: TrendingUp,
+      color: 'border-purple-200 hover:border-purple-300 hover:bg-purple-50',
+      textColor: 'text-purple-600',
+      action: () => onNavigate('reports')
+    }
+  ]
+
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">لوحة التحكم</h1>
-        <p className="text-gray-600">مرحباً بك في نظام إدارة المنتجات والمبيعات</p>
+    <div className="w-full">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">لوحة التحكم</h1>
+        <p className="text-sm sm:text-base text-gray-600">مرحباً بك في نظام إدارة المنتجات والمبيعات</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {statCards.map((stat, index) => {
           const Icon = stat.icon
           return (
-            <div key={index} className="bg-white rounded-lg shadow p-6">
+            <div key={index} className="bg-white rounded-lg shadow p-4 sm:p-6">
               <div className="flex items-center">
-                <div className={`p-3 rounded-full ${stat.color} bg-opacity-10`}>
-                  <Icon className={`w-6 h-6 ${stat.textColor}`} />
+                <div className={`p-2 sm:p-3 rounded-full ${stat.color} bg-opacity-10`}>
+                  <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.textColor}`} />
                 </div>
-                <div className="mr-4">
-                  <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                <div className="mr-3 sm:mr-4 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">{stat.title}</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-words">{stat.value}</p>
                 </div>
               </div>
             </div>
@@ -109,21 +133,22 @@ export default function HomePage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">إجراءات سريعة</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center justify-center p-4 border-2 border-blue-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors">
-            <Package className="w-6 h-6 text-blue-600 ml-2" />
-            <span className="text-blue-600 font-medium">إضافة منتج جديد</span>
-          </button>
-          <button className="flex items-center justify-center p-4 border-2 border-green-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors">
-            <ShoppingCart className="w-6 h-6 text-green-600 ml-2" />
-            <span className="text-green-600 font-medium">تسجيل مبيعات</span>
-          </button>
-          <button className="flex items-center justify-center p-4 border-2 border-purple-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-colors">
-            <TrendingUp className="w-6 h-6 text-purple-600 ml-2" />
-            <span className="text-purple-600 font-medium">عرض التقارير</span>
-          </button>
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">إجراءات سريعة</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {quickActions.map((action, index) => {
+            const Icon = action.icon
+            return (
+              <button
+                key={index}
+                onClick={action.action}
+                className={`flex items-center justify-center p-3 sm:p-4 border-2 rounded-lg transition-colors cursor-pointer ${action.color} min-h-[60px] sm:min-h-[80px]`}
+              >
+                <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${action.textColor} ml-2 flex-shrink-0`} />
+                <span className={`${action.textColor} font-medium text-sm sm:text-base text-center`}>{action.title}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>
