@@ -132,16 +132,69 @@ export default function ProductsPage() {
     if (file) {
       setUploadingImage(true)
       try {
-        // رفع الصورة إلى Supabase Storage
+        // التحقق من حجم الصورة (أقل من 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          alert('حجم الصورة يجب أن يكون أقل من 5 ميجابايت')
+          return
+        }
+
+        // التحقق من نوع الملف
+        if (!file.type.startsWith('image/')) {
+          alert('يرجى اختيار ملف صورة صحيح')
+          return
+        }
+
+        // محاولة رفع الصورة إلى Supabase Storage
         const fileExt = file.name.split('.').pop()
-        const fileName = `${Math.random()}.${fileExt}`
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
         const filePath = `product-images/${fileName}`
 
+        // محاولة إنشاء bucket إذا لم يكن موجوداً
+        try {
+          const { data: buckets } = await supabase.storage.listBuckets()
+          const bucketExists = buckets?.some(bucket => bucket.name === 'product-images')
+          
+          if (!bucketExists) {
+            // إنشاء bucket جديد
+            const { error: createError } = await supabase.storage.createBucket('product-images', {
+              public: true,
+              allowedMimeTypes: ['image/*'],
+              fileSizeLimit: 5242880 // 5MB
+            })
+            
+            if (createError) {
+              console.warn('فشل في إنشاء bucket، سيتم استخدام حل بديل:', createError)
+              // استخدام حل بديل - حفظ الصورة كـ base64
+              const reader = new FileReader()
+              reader.onload = (e) => {
+                setFormData({ ...formData, image_url: e.target.result })
+              }
+              reader.readAsDataURL(file)
+              return
+            }
+          }
+        } catch (bucketError) {
+          console.warn('خطأ في التحقق من bucket:', bucketError)
+        }
+
+        // رفع الصورة
         const { error: uploadError } = await supabase.storage
           .from('product-images')
-          .upload(filePath, file)
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          })
 
-        if (uploadError) throw uploadError
+        if (uploadError) {
+          console.warn('فشل في رفع الصورة إلى Storage، سيتم استخدام حل بديل:', uploadError)
+          // استخدام حل بديل - حفظ الصورة كـ base64
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            setFormData({ ...formData, image_url: e.target.result })
+          }
+          reader.readAsDataURL(file)
+          return
+        }
 
         // الحصول على رابط الصورة
         const { data: { publicUrl } } = supabase.storage
@@ -149,30 +202,23 @@ export default function ProductsPage() {
           .getPublicUrl(filePath)
 
         setFormData({ ...formData, image_url: publicUrl })
+        
       } catch (error) {
-        console.error('خطأ في رفع الصورة:', error)
-        alert('فشل في رفع الصورة')
+        console.error('خطأ في معالجة الصورة:', error)
+        
+        // حل بديل - حفظ الصورة كـ base64
+        try {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            setFormData({ ...formData, image_url: e.target.result })
+          }
+          reader.readAsDataURL(file)
+        } catch (base64Error) {
+          console.error('فشل في تحويل الصورة إلى base64:', base64Error)
+          alert('فشل في معالجة الصورة. يرجى المحاولة مرة أخرى.')
+        }
       } finally {
         setUploadingImage(false)
-      }
-    }
-  }
-
-  const handleBarcodeImageUpload = async (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      setBarcodeImage(file)
-      setProcessingBarcode(true)
-      setBarcodeResult('')
-      
-      try {
-        const result = await processBarcodeImage(file)
-        setBarcodeResult(result)
-      } catch (error) {
-        console.error('خطأ في معالجة الباركود:', error)
-        setBarcodeResult('فشل في قراءة الباركود')
-      } finally {
-        setProcessingBarcode(false)
       }
     }
   }
@@ -274,6 +320,25 @@ export default function ProductsPage() {
       
       reader.readAsDataURL(file)
     })
+  }
+
+  const handleBarcodeImageUpload = async (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setBarcodeImage(file)
+      setProcessingBarcode(true)
+      setBarcodeResult('')
+      
+      try {
+        const result = await processBarcodeImage(file)
+        setBarcodeResult(result)
+      } catch (error) {
+        console.error('خطأ في معالجة الباركود:', error)
+        setBarcodeResult('فشل في قراءة الباركود')
+      } finally {
+        setProcessingBarcode(false)
+      }
+    }
   }
 
   const totalPages = Math.ceil(products.length / productsPerPage)
