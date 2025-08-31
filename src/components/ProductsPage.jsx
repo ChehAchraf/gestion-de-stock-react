@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Search, Edit, Trash2, Camera, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { BrowserMultiFormatReader } from '@zxing/library'
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([])
@@ -12,6 +13,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState(null)
   const [barcodeImage, setBarcodeImage] = useState(null)
   const [barcodeResult, setBarcodeResult] = useState('')
+  const [processingBarcode, setProcessingBarcode] = useState(false)
   
   const productsPerPage = 8
 
@@ -121,14 +123,122 @@ export default function ProductsPage() {
     })
   }
 
-  const handleBarcodeImageUpload = (e) => {
+  const handleBarcodeImageUpload = async (e) => {
     const file = e.target.files[0]
     if (file) {
       setBarcodeImage(file)
-      // هنا يمكن إضافة معالجة الباركود من الصورة
-      // للتبسيط، سنستخدم قيمة عشوائية
-      setBarcodeResult(Math.random().toString(36).substr(2, 8).toUpperCase())
+      setProcessingBarcode(true)
+      setBarcodeResult('')
+      
+      try {
+        const result = await processBarcodeImage(file)
+        setBarcodeResult(result)
+      } catch (error) {
+        console.error('خطأ في معالجة الباركود:', error)
+        setBarcodeResult('فشل في قراءة الباركود')
+      } finally {
+        setProcessingBarcode(false)
+      }
     }
+  }
+
+  const processBarcodeImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = async () => {
+          try {
+            // إنشاء canvas لرسم الصورة
+            const canvas = document.createElement('canvas')
+            const ctx = canvas.getContext('2d')
+            
+            // تعيين أبعاد canvas
+            canvas.width = img.width
+            canvas.height = img.height
+            
+            // رسم الصورة على canvas
+            ctx.drawImage(img, 0, 0)
+            
+            // الحصول على بيانات الصورة
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+            
+            // استخدام ZXing لقراءة الباركود
+            const codeReader = new BrowserMultiFormatReader()
+            
+            // تحويل ImageData إلى HTMLImageElement
+            const tempCanvas = document.createElement('canvas')
+            tempCanvas.width = imageData.width
+            tempCanvas.height = imageData.height
+            const tempCtx = tempCanvas.getContext('2d')
+            tempCtx.putImageData(imageData, 0, 0)
+            
+            // إنشاء صورة جديدة من canvas
+            const newImg = new Image()
+            newImg.onload = async () => {
+              try {
+                // محاولة قراءة الباركود باستخدام ZXing
+                const result = await codeReader.decodeFromImage(newImg)
+                
+                if (result && result.text) {
+                  // تنظيف النتيجة - إزالة المسافات والأحرف غير المرغوبة
+                  let cleanResult = result.text.replace(/[^0-9]/g, '')
+                  
+                  // إذا كان الباركود يحتوي على أرقام فقط، استخدمه كما هو
+                  if (cleanResult.length > 0) {
+                    resolve(cleanResult)
+                  } else {
+                    // إذا لم تكن هناك أرقام، استخدم النص الأصلي
+                    resolve(result.text.trim())
+                  }
+                } else {
+                  reject(new Error('لم يتم العثور على باركود في الصورة'))
+                }
+              } catch (zxingError) {
+                // إذا فشل ZXing، جرب jsQR كبديل
+                try {
+                  const jsQR = (await import('jsqr')).default
+                  const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                  })
+                  
+                  if (code) {
+                    let cleanResult = code.data.replace(/[^0-9]/g, '')
+                    if (cleanResult.length > 0) {
+                      resolve(cleanResult)
+                    } else {
+                      resolve(code.data.trim())
+                    }
+                  } else {
+                    reject(new Error('لم يتم العثور على باركود في الصورة'))
+                  }
+                } catch (jsQRError) {
+                  reject(new Error('فشل في قراءة الباركود'))
+                }
+              }
+            }
+            
+            newImg.src = tempCanvas.toDataURL()
+            
+          } catch (error) {
+            reject(error)
+          }
+        }
+        
+        img.onerror = () => {
+          reject(new Error('فشل في تحميل الصورة'))
+        }
+        
+        img.src = e.target.result
+      }
+      
+      reader.onerror = () => {
+        reject(new Error('فشل في قراءة الملف'))
+      }
+      
+      reader.readAsDataURL(file)
+    })
   }
 
   const totalPages = Math.ceil(products.length / productsPerPage)
@@ -420,7 +530,13 @@ export default function ProductsPage() {
                 />
               </div>
 
-              {barcodeResult && (
+              {processingBarcode && (
+                <div className="text-center py-4">
+                  <div className="text-blue-600">جاري معالجة الباركود...</div>
+                </div>
+              )}
+
+              {barcodeResult && !processingBarcode && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     النتيجة:
@@ -429,22 +545,30 @@ export default function ProductsPage() {
                     type="text"
                     value={barcodeResult}
                     readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      barcodeResult === 'فشل في قراءة الباركود' 
+                        ? 'border-red-300 bg-red-50 text-red-700' 
+                        : 'border-green-300 bg-green-50 text-green-700'
+                    }`}
                   />
+                  {barcodeResult !== 'فشل في قراءة الباركود' && (
+                    <p className="text-sm text-green-600 mt-1">تم قراءة الباركود بنجاح!</p>
+                  )}
                 </div>
               )}
 
               <div className="flex space-x-3 pt-4">
                 <button
                   onClick={() => {
-                    if (barcodeResult) {
+                    if (barcodeResult && barcodeResult !== 'فشل في قراءة الباركود') {
                       setFormData({ ...formData, reference_number: barcodeResult })
                       setShowBarcodeModal(false)
                       setBarcodeResult('')
                       setBarcodeImage(null)
                     }
                   }}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-medium"
+                  disabled={!barcodeResult || barcodeResult === 'فشل في قراءة الباركود'}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white py-2 px-4 rounded-md font-medium"
                 >
                   استخدام النتيجة
                 </button>

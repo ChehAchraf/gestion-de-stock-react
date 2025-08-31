@@ -2,14 +2,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap');
 
 * {
-  font-family: 'Cairo', sans-serif;
+  font-family: 'Cairo', sans-serif !important;
 }
 
 body {
-  direction: ltr;
-  text-align: left;
+  direction: rtl;
+  text-align: right;
   margin: 0;
   padding: 0;
   background-color: #f9fafb;
+  font-family: 'Cairo', sans-serif !important;
+}
+
+/* تأكيد استخدام خط Cairo */
+h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, select, label, th, td {
+  font-family: 'Cairo', sans-serif !important;
 }
 
