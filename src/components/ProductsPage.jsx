@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit, Trash2, Camera, X } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Camera, X, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { BrowserMultiFormatReader } from '@zxing/library'
 
@@ -14,6 +14,7 @@ export default function ProductsPage() {
   const [barcodeImage, setBarcodeImage] = useState(null)
   const [barcodeResult, setBarcodeResult] = useState('')
   const [processingBarcode, setProcessingBarcode] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   
   const productsPerPage = 8
 
@@ -22,7 +23,8 @@ export default function ProductsPage() {
     description: '',
     quantity: '',
     price: '',
-    reference_number: ''
+    reference_number: '',
+    image_url: ''
   })
 
   useEffect(() => {
@@ -108,7 +110,8 @@ export default function ProductsPage() {
       description: product.description || '',
       quantity: product.quantity.toString(),
       price: product.price.toString(),
-      reference_number: product.reference_number || ''
+      reference_number: product.reference_number || '',
+      image_url: product.image_url || ''
     })
     setShowAddModal(true)
   }
@@ -119,8 +122,40 @@ export default function ProductsPage() {
       description: '',
       quantity: '',
       price: '',
-      reference_number: ''
+      reference_number: '',
+      image_url: ''
     })
+  }
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setUploadingImage(true)
+      try {
+        // رفع الصورة إلى Supabase Storage
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random()}.${fileExt}`
+        const filePath = `product-images/${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(filePath, file)
+
+        if (uploadError) throw uploadError
+
+        // الحصول على رابط الصورة
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(filePath)
+
+        setFormData({ ...formData, image_url: publicUrl })
+      } catch (error) {
+        console.error('خطأ في رفع الصورة:', error)
+        alert('فشل في رفع الصورة')
+      } finally {
+        setUploadingImage(false)
+      }
+    }
   }
 
   const handleBarcodeImageUpload = async (e) => {
@@ -276,6 +311,9 @@ export default function ProductsPage() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                الصورة
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 اسم المنتج
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -295,19 +333,37 @@ export default function ProductsPage() {
           <tbody className="bg-white divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                   جاري التحميل...
                 </td>
               </tr>
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                   لا توجد منتجات
                 </td>
               </tr>
             ) : (
               products.map((product) => (
                 <tr key={product.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {product.image_url ? (
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-12 h-12 rounded-lg object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                          e.target.nextSibling.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    {!product.image_url && (
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="w-6 h-6 text-gray-400" />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">{product.name}</div>
@@ -425,6 +481,33 @@ export default function ProductsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows="3"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  صورة المنتج
+                </label>
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                    disabled={uploadingImage}
+                  />
+                  {uploadingImage && (
+                    <div className="text-blue-600 text-sm">جاري الرفع...</div>
+                  )}
+                </div>
+                {formData.image_url && (
+                  <div className="mt-2">
+                    <img
+                      src={formData.image_url}
+                      alt="صورة المنتج"
+                      className="w-20 h-20 rounded-lg object-cover"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

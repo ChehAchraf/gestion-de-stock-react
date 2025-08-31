@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Package, ShoppingCart, DollarSign, AlertTriangle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Package, ShoppingCart, DollarSign, AlertTriangle, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 export default function ReportsPage() {
@@ -97,7 +97,8 @@ export default function ReportsPage() {
           created_at,
           products (
             name,
-            reference_number
+            reference_number,
+            image_url
           )
         `)
         .order('created_at', { ascending: false })
@@ -297,6 +298,9 @@ export default function ReportsPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  صورة المنتج
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   المنتج
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -313,6 +317,24 @@ export default function ReportsPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {reports.recentSales.map((sale) => (
                 <tr key={sale.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {sale.products?.image_url ? (
+                      <img
+                        src={sale.products.image_url}
+                        alt={sale.products?.name || 'منتج محذوف'}
+                        className="w-12 h-12 rounded-lg object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                          e.target.nextSibling.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    {!sale.products?.image_url && (
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="w-6 h-6 text-gray-400" />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">

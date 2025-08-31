@@ -6,6 +6,7 @@ CREATE TABLE products (
   quantity INTEGER NOT NULL DEFAULT 0,
   price DECIMAL(10,2) NOT NULL,
   reference_number TEXT,
+  image_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -36,9 +37,9 @@ END;
 $$ language 'plpgsql';
 
 -- إنشاء trigger لتحديث updated_at
-CREATE TRIGGER update_products_updated_at 
-    BEFORE UPDATE ON products 
-    FOR EACH ROW 
+CREATE TRIGGER update_products_updated_at
+    BEFORE UPDATE ON products
+    FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
 -- إضافة RLS (Row Level Security)

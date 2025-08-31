@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, ShoppingCart, X } from 'lucide-react'
+import { Plus, Search, ShoppingCart, X, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 export default function SalesPage() {
@@ -49,7 +49,8 @@ export default function SalesPage() {
           *,
           products (
             name,
-            reference_number
+            reference_number,
+            image_url
           )
         `)
         .order('created_at', { ascending: false })
@@ -154,6 +155,9 @@ export default function SalesPage() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                صورة المنتج
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 المنتج
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -173,19 +177,37 @@ export default function SalesPage() {
           <tbody className="bg-white divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                   جاري التحميل...
                 </td>
               </tr>
             ) : sales.length === 0 ? (
               <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                   لا توجد مبيعات
                 </td>
               </tr>
             ) : (
               sales.map((sale) => (
                 <tr key={sale.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {sale.products?.image_url ? (
+                      <img
+                        src={sale.products.image_url}
+                        alt={sale.products?.name || 'منتج محذوف'}
+                        className="w-12 h-12 rounded-lg object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                          e.target.nextSibling.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    {!sale.products?.image_url && (
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="w-6 h-6 text-gray-400" />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
@@ -286,15 +308,30 @@ export default function SalesPage() {
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-gray-600">
-                        الكمية المتوفرة: {product.quantity.toLocaleString('en-US')} | السعر: {product.price.toLocaleString('en-US')} درهم
-                      </div>
-                      {product.reference_number && (
-                        <div className="text-xs text-gray-500">
-                          الرقم المرجعي: {product.reference_number}
+                      <div className="flex items-center">
+                        {product.image_url ? (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-8 h-8 rounded mr-3 object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-gray-100 rounded mr-3 flex items-center justify-center">
+                            <ImageIcon className="w-4 h-4 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-gray-600">
+                            الكمية المتوفرة: {product.quantity.toLocaleString('en-US')} | السعر: {product.price.toLocaleString('en-US')} درهم
+                          </div>
+                          {product.reference_number && (
+                            <div className="text-xs text-gray-500">
+                              الرقم المرجعي: {product.reference_number}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -310,9 +347,24 @@ export default function SalesPage() {
                         المنتج المختار
                       </label>
                       <div className="p-3 bg-gray-50 rounded-md">
-                        <div className="font-medium">{selectedProduct.name}</div>
-                        <div className="text-sm text-gray-600">
-                          الكمية المتوفرة: {selectedProduct.quantity.toLocaleString('en-US')}
+                        <div className="flex items-center">
+                          {selectedProduct.image_url ? (
+                            <img
+                              src={selectedProduct.image_url}
+                              alt={selectedProduct.name}
+                              className="w-12 h-12 rounded mr-3 object-cover"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-gray-100 rounded mr-3 flex items-center justify-center">
+                              <ImageIcon className="w-6 h-6 text-gray-400" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-medium">{selectedProduct.name}</div>
+                            <div className="text-sm text-gray-600">
+                              الكمية المتوفرة: {selectedProduct.quantity.toLocaleString('en-US')}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
