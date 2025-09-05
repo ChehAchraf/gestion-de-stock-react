@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, ShoppingCart, X, Image as ImageIcon, Edit, Trash2 } from 'lucide-react'
+import { Plus, Search, ShoppingCart, X, Image as ImageIcon, Edit, Trash2, CheckCircle, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 export default function SalesPage() {
@@ -16,6 +16,9 @@ export default function SalesPage() {
   const [editingSale, setEditingSale] = useState(null)
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const [filteredProducts, setFilteredProducts] = useState([])
+  const [showNotification, setShowNotification] = useState(false)
+  const [notificationType, setNotificationType] = useState('success') // 'success' or 'error'
+  const [notificationMessage, setNotificationMessage] = useState('')
   
   const salesPerPage = 8
 
@@ -23,6 +26,22 @@ export default function SalesPage() {
     fetchProducts()
     fetchSales()
   }, [currentPage, searchTerm])
+
+  // إخفاء الإشعار تلقائياً بعد 3 ثوان
+  useEffect(() => {
+    if (showNotification) {
+      const timer = setTimeout(() => {
+        setShowNotification(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [showNotification])
+
+  const showNotificationModal = (type, message) => {
+    setNotificationType(type)
+    setNotificationMessage(message)
+    setShowNotification(true)
+  }
 
   useEffect(() => {
     // تصفية المنتجات بناءً على مصطلح البحث
@@ -133,8 +152,10 @@ export default function SalesPage() {
       setProductSearchTerm('')
       fetchProducts()
       fetchSales()
+      showNotificationModal('success', 'تمت إضافة المبيعة بنجاح')
     } catch (error) {
       console.error('خطأ في تسجيل المبيعات:', error)
+      showNotificationModal('error', 'تعذر إضافة المبيعة، من فضلك حاول لاحقاً')
     }
   }
 
@@ -193,8 +214,10 @@ export default function SalesPage() {
       setSalePrice('')
       fetchProducts()
       fetchSales()
+      showNotificationModal('success', 'تم تحديث المبيعة بنجاح')
     } catch (error) {
       console.error('خطأ في تحديث المبيعات:', error)
+      showNotificationModal('error', 'تعذر تحديث المبيعة، من فضلك حاول لاحقاً')
     }
   }
 
@@ -224,8 +247,10 @@ export default function SalesPage() {
 
       fetchProducts()
       fetchSales()
+      showNotificationModal('success', 'تم حذف المبيعة بنجاح')
     } catch (error) {
       console.error('خطأ في حذف المبيعات:', error)
+      showNotificationModal('error', 'تعذر حذف المبيعة، من فضلك حاول لاحقاً')
     }
   }
 
@@ -704,6 +729,45 @@ export default function SalesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Modal */}
+      {showNotification && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              {notificationType === 'success' ? (
+                <CheckCircle className="w-12 h-12 text-green-500" />
+              ) : (
+                <AlertCircle className="w-12 h-12 text-red-500" />
+              )}
+            </div>
+            <div className="text-center">
+              <h3 className={`text-lg font-semibold mb-2 ${
+                notificationType === 'success' ? 'text-green-800' : 'text-red-800'
+              }`}>
+                {notificationType === 'success' ? 'نجح العمل!' : 'حدث خطأ!'}
+              </h3>
+              <p className={`text-sm ${
+                notificationType === 'success' ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {notificationMessage}
+              </p>
+            </div>
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setShowNotification(false)}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                  notificationType === 'success'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
+              >
+                موافق
+              </button>
+            </div>
           </div>
         </div>
       )}

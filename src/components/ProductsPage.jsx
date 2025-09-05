@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit, Trash2, Camera, X, Image as ImageIcon } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Camera, X, Image as ImageIcon, CheckCircle, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { BrowserMultiFormatReader } from '@zxing/library'
 
@@ -15,6 +15,9 @@ export default function ProductsPage() {
   const [barcodeResult, setBarcodeResult] = useState('')
   const [processingBarcode, setProcessingBarcode] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [showNotification, setShowNotification] = useState(false)
+  const [notificationType, setNotificationType] = useState('success') // 'success' or 'error'
+  const [notificationMessage, setNotificationMessage] = useState('')
   
   const productsPerPage = 8
 
@@ -30,6 +33,22 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchProducts()
   }, [currentPage, searchTerm])
+
+  // إخفاء الإشعار تلقائياً بعد 3 ثوان
+  useEffect(() => {
+    if (showNotification) {
+      const timer = setTimeout(() => {
+        setShowNotification(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [showNotification])
+
+  const showNotificationModal = (type, message) => {
+    setNotificationType(type)
+    setNotificationMessage(message)
+    setShowNotification(true)
+  }
 
   const fetchProducts = async () => {
     try {
@@ -72,11 +91,15 @@ export default function ProductsPage() {
           .update(productData)
           .eq('id', editingProduct.id)
         if (error) throw error
+        
+        showNotificationModal('success', 'تم تحديث المنتج بنجاح')
       } else {
         const { error } = await supabase
           .from('products')
           .insert([productData])
         if (error) throw error
+        
+        showNotificationModal('success', 'تمت إضافة المنتج بنجاح')
       }
 
       setShowAddModal(false)
@@ -85,6 +108,7 @@ export default function ProductsPage() {
       fetchProducts()
     } catch (error) {
       console.error('خطأ في حفظ المنتج:', error)
+      showNotificationModal('error', 'تعذر إضافة المنتج، من فضلك حاول لاحقاً')
     }
   }
 
@@ -96,9 +120,12 @@ export default function ProductsPage() {
           .delete()
           .eq('id', id)
         if (error) throw error
+        
+        showNotificationModal('success', 'تم حذف المنتج بنجاح')
         fetchProducts()
       } catch (error) {
         console.error('خطأ في حذف المنتج:', error)
+        showNotificationModal('error', 'تعذر حذف المنتج، من فضلك حاول لاحقاً')
       }
     }
   }
@@ -738,6 +765,45 @@ export default function ProductsPage() {
                   إلغاء
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Modal */}
+      {showNotification && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <div className="flex items-center justify-center mb-4">
+              {notificationType === 'success' ? (
+                <CheckCircle className="w-12 h-12 text-green-500" />
+              ) : (
+                <AlertCircle className="w-12 h-12 text-red-500" />
+              )}
+            </div>
+            <div className="text-center">
+              <h3 className={`text-lg font-semibold mb-2 ${
+                notificationType === 'success' ? 'text-green-800' : 'text-red-800'
+              }`}>
+                {notificationType === 'success' ? 'نجح العمل!' : 'حدث خطأ!'}
+              </h3>
+              <p className={`text-sm ${
+                notificationType === 'success' ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {notificationMessage}
+              </p>
+            </div>
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setShowNotification(false)}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                  notificationType === 'success'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
+              >
+                موافق
+              </button>
             </div>
           </div>
         </div>
