@@ -24,9 +24,9 @@ const apiCall = async (endpoint, options = {}) => {
 }
 
 // Products queries
-export const useProducts = (page = 1, searchTerm = '', limit = 8) => {
+export const useProducts = (page = 1, searchTerm = '', limit = 8, categoryId = '') => {
   return useQuery({
-    queryKey: ['products', page, searchTerm, limit],
+    queryKey: ['products', page, searchTerm, limit, categoryId],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -35,6 +35,10 @@ export const useProducts = (page = 1, searchTerm = '', limit = 8) => {
 
       if (searchTerm) {
         params.append('search', searchTerm)
+      }
+
+      if (categoryId) {
+        params.append('category_id', categoryId)
       }
 
       const response = await apiCall(`/products?${params}`)

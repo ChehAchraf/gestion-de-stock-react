@@ -6,6 +6,7 @@ import { useDebounce } from '../hooks/useDebounce'
 
 export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showBarcodeModal, setShowBarcodeModal] = useState(false)
@@ -24,7 +25,7 @@ export default function ProductsPage() {
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   
   // Use Laravel API hooks
-  const { data: productsData, isLoading, error } = useProducts(currentPage, debouncedSearchTerm, productsPerPage)
+  const { data: productsData, isLoading, error } = useProducts(currentPage, debouncedSearchTerm, productsPerPage, selectedCategory)
   const { data: categories = [] } = useCategoriesForSelect()
   const createProductMutation = useCreateProduct()
   const updateProductMutation = useUpdateProduct()
@@ -411,7 +412,15 @@ export default function ProductsPage() {
   return (
     <div className="w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">إدارة المنتجات</h1>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">إدارة المنتجات</h1>
+          {totalCount > 0 && (
+            <p className="text-sm text-gray-600 mt-1">
+              عرض {products.length} من أصل {totalCount.toLocaleString('en-US')} منتج
+              {selectedCategory && ` في فئة "${categories.find(c => c.id == selectedCategory)?.name}"`}
+            </p>
+          )}
+        </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           {selectedProducts.length > 0 && (
             <button
@@ -439,18 +448,83 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search and Filters */}
       <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="البحث في المنتجات..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="البحث في المنتجات..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          
+          {/* Category Filter */}
+          <div className="relative">
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value)
+                setCurrentPage(1) // Reset to first page when filtering
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
+            >
+              <option value="">جميع الفئات</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
         </div>
+        
+        {/* Active Filters Display */}
+        {(searchTerm || selectedCategory) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {searchTerm && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                البحث: {searchTerm}
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="mr-2 text-blue-600 hover:text-blue-800"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {selectedCategory && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                الفئة: {categories.find(c => c.id == selectedCategory)?.name}
+                <button
+                  onClick={() => setSelectedCategory('')}
+                  className="mr-2 text-green-600 hover:text-green-800"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setSearchTerm('')
+                setSelectedCategory('')
+                setCurrentPage(1)
+              }}
+              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
+            >
+              مسح جميع الفلاتر
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Products Table */}
@@ -500,7 +574,12 @@ export default function ProductsPage() {
               ) : products.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="px-3 sm:px-6 py-4 text-center text-gray-500">
-                    لا توجد منتجات
+                    {selectedCategory 
+                      ? `لا توجد منتجات في الفئة "${categories.find(c => c.id == selectedCategory)?.name}"`
+                      : searchTerm 
+                        ? `لا توجد منتجات تطابق البحث "${searchTerm}"`
+                        : 'لا توجد منتجات'
+                    }
                   </td>
                 </tr>
               ) : (
