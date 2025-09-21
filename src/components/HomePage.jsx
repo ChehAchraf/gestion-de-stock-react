@@ -1,83 +1,52 @@
-import { useState, useEffect } from 'react'
-import { Package, ShoppingCart, TrendingUp, AlertTriangle } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { Package, ShoppingCart, TrendingUp, AlertTriangle, Tag } from 'lucide-react'
+import { useDashboardStats, useCategories } from '../hooks/useLaravelApi'
 
 export default function HomePage({ onNavigate }) {
-  const [stats, setStats] = useState({
+  const { data: stats = {
     totalProducts: 0,
     totalSales: 0,
     lowStockProducts: 0,
     totalRevenue: 0
-  })
-
-  useEffect(() => {
-    fetchStats()
-  }, [])
-
-  const fetchStats = async () => {
-    try {
-      // إجمالي المنتجات
-      const { count: productsCount } = await supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true })
-
-      // إجمالي المبيعات
-      const { count: salesCount } = await supabase
-        .from('sales')
-        .select('*', { count: 'exact', head: true })
-
-      // المنتجات منخفضة المخزون
-      const { data: lowStockProducts } = await supabase
-        .from('products')
-        .select('*')
-        .lt('quantity', 10)
-
-      // إجمالي الإيرادات
-      const { data: sales } = await supabase
-        .from('sales')
-        .select('total_price')
-
-      const totalRevenue = sales?.reduce((sum, sale) => sum + (sale.total_price || 0), 0) || 0
-
-      setStats({
-        totalProducts: productsCount || 0,
-        totalSales: salesCount || 0,
-        lowStockProducts: lowStockProducts?.length || 0,
-        totalRevenue: totalRevenue
-      })
-    } catch (error) {
-      console.error('خطأ في جلب الإحصائيات:', error)
-    }
-  }
+  }, isLoading } = useDashboardStats()
+  
+  const { data: categoriesData } = useCategories(1, '', 1000) // Get all categories
+  const totalCategories = categoriesData?.totalCount || 0
 
   const statCards = [
     {
       title: 'إجمالي المنتجات',
-      value: stats.totalProducts.toLocaleString('en-US'),
+      value: (stats?.totalProducts || 0).toLocaleString('en-US'),
       icon: Package,
       color: 'bg-blue-500',
       textColor: 'text-blue-500'
     },
     {
       title: 'إجمالي المبيعات',
-      value: stats.totalSales.toLocaleString('en-US'),
+      value: (stats?.totalSales || 0).toLocaleString('en-US'),
       icon: ShoppingCart,
       color: 'bg-green-500',
       textColor: 'text-green-500'
     },
     {
       title: 'المنتجات منخفضة المخزون',
-      value: stats.lowStockProducts.toLocaleString('en-US'),
+      value: (stats?.lowStockProducts || 0).toLocaleString('en-US'),
       icon: AlertTriangle,
       color: 'bg-yellow-500',
       textColor: 'text-yellow-500'
     },
     {
       title: 'إجمالي الإيرادات',
-      value: `${stats.totalRevenue.toLocaleString('en-US')} درهم`,
+      value: `${(stats?.totalRevenue || 0).toLocaleString('en-US')} درهم`,
       icon: TrendingUp,
       color: 'bg-purple-500',
       textColor: 'text-purple-500'
+    },
+    {
+      title: 'إجمالي الفئات',
+      value: totalCategories.toLocaleString('en-US'),
+      icon: Tag,
+      color: 'bg-indigo-500',
+      textColor: 'text-indigo-500'
     }
   ]
 
@@ -97,6 +66,13 @@ export default function HomePage({ onNavigate }) {
       action: () => onNavigate('sales')
     },
     {
+      title: 'إدارة الفئات',
+      icon: Tag,
+      color: 'border-indigo-200 hover:border-indigo-300 hover:bg-indigo-50',
+      textColor: 'text-indigo-600',
+      action: () => onNavigate('categories')
+    },
+    {
       title: 'عرض التقارير',
       icon: TrendingUp,
       color: 'border-purple-200 hover:border-purple-300 hover:bg-purple-50',
@@ -113,7 +89,7 @@ export default function HomePage({ onNavigate }) {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {statCards.map((stat, index) => {
           const Icon = stat.icon
           return (
@@ -135,7 +111,7 @@ export default function HomePage({ onNavigate }) {
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow p-4 sm:p-6">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">إجراءات سريعة</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {quickActions.map((action, index) => {
             const Icon = action.icon
             return (

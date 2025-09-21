@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { TrendingUp, TrendingDown, Package, ShoppingCart, DollarSign, AlertTriangle, Image as ImageIcon } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { useReports } from '../hooks/useLaravelApi'
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState({
+  const [dateRange, setDateRange] = useState('all') // all, week, month, year
+  
+  const { data: reports = {
     totalRevenue: 0,
     totalSales: 0,
     totalProducts: 0,
@@ -12,144 +14,11 @@ export default function ReportsPage() {
     recentSales: [],
     monthlyRevenue: [],
     stockAlerts: []
-  })
-  const [loading, setLoading] = useState(true)
-  const [dateRange, setDateRange] = useState('all') // all, week, month, year
+  }, isLoading: loading } = useReports(dateRange)
 
-  useEffect(() => {
-    fetchReports()
-  }, [dateRange])
-
-  const fetchReports = async () => {
-    try {
-      setLoading(true)
-      
-      // إجمالي الإيرادات
-      const { data: sales } = await supabase
-        .from('sales')
-        .select('total_price, created_at')
-
-      let filteredSales = sales || []
-      if (dateRange !== 'all') {
-        const now = new Date()
-        let startDate
-        switch (dateRange) {
-          case 'week':
-            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-            break
-          case 'month':
-            startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-            break
-          case 'year':
-            startDate = new Date(now.getFullYear(), 0, 1)
-            break
-        }
-        filteredSales = sales?.filter(sale => new Date(sale.created_at) >= startDate) || []
-      }
-
-      const totalRevenue = filteredSales.reduce((sum, sale) => sum + (sale.total_price || 0), 0)
-      const totalSales = filteredSales.length
-
-      // إجمالي المنتجات
-      const { count: productsCount } = await supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true })
-
-      // المنتجات منخفضة المخزون
-      const { data: lowStockProducts } = await supabase
-        .from('products')
-        .select('*')
-        .lt('quantity', 10)
-
-      // أفضل المنتجات مبيعاً
-      const { data: topSelling } = await supabase
-        .from('sales')
-        .select(`
-          quantity,
-          total_price,
-          products (
-            name,
-            reference_number
-          )
-        `)
-
-      const productSales = {}
-      topSelling?.forEach(sale => {
-        const productName = sale.products?.name || 'منتج محذوف'
-        if (!productSales[productName]) {
-          productSales[productName] = { quantity: 0, revenue: 0 }
-        }
-        productSales[productName].quantity += sale.quantity
-        productSales[productName].revenue += sale.total_price
-      })
-
-      const topSellingProducts = Object.entries(productSales)
-        .map(([name, data]) => ({ name, ...data }))
-        .sort((a, b) => b.quantity - a.quantity)
-        .slice(0, 5)
-
-      // المبيعات الحديثة
-      const { data: recentSales } = await supabase
-        .from('sales')
-        .select(`
-          quantity,
-          total_price,
-          created_at,
-          products (
-            name,
-            reference_number,
-            image_url
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      // الإيرادات الشهرية (آخر 6 أشهر)
-      const monthlyRevenue = []
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date()
-        date.setMonth(date.getMonth() - i)
-        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
-        const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
-        
-        const monthSales = sales?.filter(sale => {
-          const saleDate = new Date(sale.created_at)
-          return saleDate >= monthStart && saleDate <= monthEnd
-        }) || []
-        
-        const monthRevenue = monthSales.reduce((sum, sale) => sum + (sale.total_price || 0), 0)
-        monthlyRevenue.push({
-          month: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-          revenue: monthRevenue
-        })
-      }
-
-      // تنبيهات المخزون
-      const stockAlerts = lowStockProducts?.map(product => ({
-        name: product.name,
-        quantity: product.quantity,
-        reference_number: product.reference_number
-      })) || []
-
-      setReports({
-        totalRevenue,
-        totalSales,
-        totalProducts: productsCount || 0,
-        lowStockProducts: lowStockProducts?.length || 0,
-        topSellingProducts,
-        recentSales: recentSales || [],
-        monthlyRevenue,
-        stockAlerts
-      })
-    } catch (error) {
-      console.error('خطأ في جلب التقارير:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const getRevenueChange = () => {
-    if (reports.monthlyRevenue.length < 2) return 0
+    if (!reports?.monthlyRevenue || reports.monthlyRevenue.length < 2) return 0
     const current = reports.monthlyRevenue[reports.monthlyRevenue.length - 1].revenue
     const previous = reports.monthlyRevenue[reports.monthlyRevenue.length - 2].revenue
     if (previous === 0) return 100
@@ -191,7 +60,7 @@ export default function ReportsPage() {
             </div>
             <div className="mr-4">
               <p className="text-sm font-medium text-gray-600">إجمالي الإيرادات</p>
-              <p className="text-2xl font-bold text-gray-900">{reports.totalRevenue.toLocaleString('en-US')} درهم</p>
+              <p className="text-2xl font-bold text-gray-900">{(reports?.totalRevenue || 0).toLocaleString('en-US')} درهم</p>
               <div className="flex items-center text-sm">
                 {revenueChange >= 0 ? (
                   <TrendingUp className="w-4 h-4 text-green-500 ml-1" />
@@ -214,7 +83,7 @@ export default function ReportsPage() {
             </div>
             <div className="mr-4">
               <p className="text-sm font-medium text-gray-600">إجمالي المبيعات</p>
-              <p className="text-2xl font-bold text-gray-900">{reports.totalSales.toLocaleString('en-US')}</p>
+              <p className="text-2xl font-bold text-gray-900">{(reports?.totalSales || 0).toLocaleString('en-US')}</p>
             </div>
           </div>
         </div>
@@ -226,7 +95,7 @@ export default function ReportsPage() {
             </div>
             <div className="mr-4">
               <p className="text-sm font-medium text-gray-600">إجمالي المنتجات</p>
-              <p className="text-2xl font-bold text-gray-900">{reports.totalProducts.toLocaleString('en-US')}</p>
+              <p className="text-2xl font-bold text-gray-900">{(reports?.totalProducts || 0).toLocaleString('en-US')}</p>
             </div>
           </div>
         </div>
@@ -238,7 +107,7 @@ export default function ReportsPage() {
             </div>
             <div className="mr-4">
               <p className="text-sm font-medium text-gray-600">منخفضة المخزون</p>
-              <p className="text-2xl font-bold text-gray-900">{reports.lowStockProducts.toLocaleString('en-US')}</p>
+              <p className="text-2xl font-bold text-gray-900">{(reports?.lowStockProducts || 0).toLocaleString('en-US')}</p>
             </div>
           </div>
         </div>
@@ -249,7 +118,7 @@ export default function ReportsPage() {
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">أفضل المنتجات مبيعاً</h2>
           <div className="space-y-4">
-            {reports.topSellingProducts.map((product, index) => (
+            {(reports?.topSellingProducts || []).map((product, index) => (
               <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <div className="font-medium">{product.name}</div>
@@ -268,10 +137,10 @@ export default function ReportsPage() {
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">تنبيهات المخزون</h2>
           <div className="space-y-3">
-            {reports.stockAlerts.length === 0 ? (
+            {(reports?.stockAlerts || []).length === 0 ? (
               <p className="text-gray-500 text-center py-4">لا توجد تنبيهات مخزون</p>
             ) : (
-              reports.stockAlerts.map((product, index) => (
+              (reports?.stockAlerts || []).map((product, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
                   <div>
                     <div className="font-medium text-red-800">{product.name}</div>
@@ -315,13 +184,13 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {reports.recentSales.map((sale) => (
+              {(reports?.recentSales || []).map((sale) => (
                 <tr key={sale.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {sale.products?.image_url ? (
+                    {sale.product?.image_url ? (
                       <img
-                        src={sale.products.image_url}
-                        alt={sale.products?.name || 'منتج محذوف'}
+                        src={sale.product.image_url}
+                        alt={sale.product?.name || 'منتج محذوف'}
                         className="w-12 h-12 rounded-lg object-cover"
                         onError={(e) => {
                           e.target.style.display = 'none'
@@ -329,7 +198,7 @@ export default function ReportsPage() {
                         }}
                       />
                     ) : null}
-                    {!sale.products?.image_url && (
+                    {!sale.product?.image_url && (
                       <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                         <ImageIcon className="w-6 h-6 text-gray-400" />
                       </div>
@@ -338,11 +207,11 @@ export default function ReportsPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {sale.products?.name || 'منتج محذوف'}
+                        {sale.product?.name || 'منتج محذوف'}
                       </div>
-                      {sale.products?.reference_number && (
+                      {sale.product?.reference_number && (
                         <div className="text-sm text-gray-500">
-                          {sale.products.reference_number}
+                          {sale.product.reference_number}
                         </div>
                       )}
                     </div>
@@ -367,7 +236,7 @@ export default function ReportsPage() {
       <div className="mt-8 bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">الإيرادات الشهرية</h2>
         <div className="grid grid-cols-6 gap-4">
-          {reports.monthlyRevenue.map((month, index) => (
+          {(reports?.monthlyRevenue || []).map((month, index) => (
             <div key={index} className="text-center">
               <div className="text-sm text-gray-600 mb-2">{month.month}</div>
               <div className="text-lg font-semibold text-gray-900">

@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit, Trash2, Camera, X, Image as ImageIcon, CheckCircle, AlertCircle } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { Plus, Search, Edit, Trash2, Camera, X, Image as ImageIcon, CheckCircle, AlertCircle, Trash } from 'lucide-react'
 import { BrowserMultiFormatReader } from '@zxing/library'
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useBulkDeleteProducts, useDeleteAllProducts, useCategoriesForSelect } from '../hooks/useLaravelApi'
+import { useDebounce } from '../hooks/useDebounce'
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -18,8 +17,24 @@ export default function ProductsPage() {
   const [showNotification, setShowNotification] = useState(false)
   const [notificationType, setNotificationType] = useState('success') // 'success' or 'error'
   const [notificationMessage, setNotificationMessage] = useState('')
+  const [selectedProducts, setSelectedProducts] = useState([])
+  const [selectAll, setSelectAll] = useState(false)
   
   const productsPerPage = 8
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
+  
+  // Use Laravel API hooks
+  const { data: productsData, isLoading, error } = useProducts(currentPage, debouncedSearchTerm, productsPerPage)
+  const { data: categories = [] } = useCategoriesForSelect()
+  const createProductMutation = useCreateProduct()
+  const updateProductMutation = useUpdateProduct()
+  const deleteProductMutation = useDeleteProduct()
+  const bulkDeleteProductsMutation = useBulkDeleteProducts()
+  const deleteAllProductsMutation = useDeleteAllProducts()
+  
+  const products = productsData?.data || []
+  const totalCount = productsData?.totalCount || 0
+  const loading = isLoading
 
   const [formData, setFormData] = useState({
     name: '',
@@ -27,12 +42,9 @@ export default function ProductsPage() {
     quantity: '',
     price: '',
     reference_number: '',
-    image_url: ''
+    image_url: '',
+    category_id: ''
   })
-
-  useEffect(() => {
-    fetchProducts()
-  }, [currentPage, searchTerm])
 
   // إخفاء الإشعار تلقائياً بعد 3 ثوان
   useEffect(() => {
@@ -50,32 +62,6 @@ export default function ProductsPage() {
     setShowNotification(true)
   }
 
-  const fetchProducts = async () => {
-    try {
-      setLoading(true)
-      let query = supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (searchTerm) {
-        query = query.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,reference_number.ilike.%${searchTerm}%`)
-      }
-
-      const from = (currentPage - 1) * productsPerPage
-      const to = from + productsPerPage - 1
-
-      const { data, error } = await query.range(from, to)
-
-      if (error) throw error
-      setProducts(data || [])
-    } catch (error) {
-      console.error('خطأ في جلب المنتجات:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
@@ -86,26 +72,16 @@ export default function ProductsPage() {
       }
 
       if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', editingProduct.id)
-        if (error) throw error
-        
+        await updateProductMutation.mutateAsync({ id: editingProduct.id, ...productData })
         showNotificationModal('success', 'تم تحديث المنتج بنجاح')
       } else {
-        const { error } = await supabase
-          .from('products')
-          .insert([productData])
-        if (error) throw error
-        
+        await createProductMutation.mutateAsync(productData)
         showNotificationModal('success', 'تمت إضافة المنتج بنجاح')
       }
 
       setShowAddModal(false)
       setEditingProduct(null)
       resetForm()
-      fetchProducts()
     } catch (error) {
       console.error('خطأ في حفظ المنتج:', error)
       showNotificationModal('error', 'تعذر إضافة المنتج، من فضلك حاول لاحقاً')
@@ -115,17 +91,77 @@ export default function ProductsPage() {
   const handleDelete = async (id) => {
     if (window.confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
       try {
-        const { error } = await supabase
-          .from('products')
-          .delete()
-          .eq('id', id)
-        if (error) throw error
-        
-        showNotificationModal('success', 'تم حذف المنتج بنجاح')
-        fetchProducts()
+        const response = await deleteProductMutation.mutateAsync(id)
+        showNotificationModal('success', response.message || 'تم حذف المنتج بنجاح')
       } catch (error) {
         console.error('خطأ في حذف المنتج:', error)
-        showNotificationModal('error', 'تعذر حذف المنتج، من فضلك حاول لاحقاً')
+        // Check if it's a sales relationship error
+        if (error.message && error.message.includes('مرتبط بمبيعات')) {
+          showNotificationModal('error', error.message)
+        } else {
+          showNotificationModal('error', 'تعذر حذف المنتج، من فضلك حاول لاحقاً')
+        }
+      }
+    }
+  }
+
+  const handleSelectProduct = (productId) => {
+    setSelectedProducts(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    )
+  }
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedProducts([])
+      setSelectAll(false)
+    } else {
+      setSelectedProducts(products.map(product => product.id))
+      setSelectAll(true)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedProducts.length === 0) {
+      showNotificationModal('error', 'يرجى اختيار منتج واحد على الأقل')
+      return
+    }
+
+    if (window.confirm(`هل أنت متأكد من حذف ${selectedProducts.length} منتج؟`)) {
+      try {
+        const response = await bulkDeleteProductsMutation.mutateAsync(selectedProducts)
+        setSelectedProducts([])
+        setSelectAll(false)
+        showNotificationModal('success', response.message || `تم حذف ${selectedProducts.length} منتج بنجاح`)
+      } catch (error) {
+        console.error('خطأ في حذف المنتجات:', error)
+        // Check if it's a sales relationship error
+        if (error.message && error.message.includes('مرتبط بمبيعات')) {
+          showNotificationModal('error', error.message)
+        } else {
+          showNotificationModal('error', 'تعذر حذف المنتجات، من فضلك حاول لاحقاً')
+        }
+      }
+    }
+  }
+
+  const handleDeleteAll = async () => {
+    if (window.confirm('هل أنت متأكد من حذف جميع المنتجات؟ هذا الإجراء لا يمكن التراجع عنه!')) {
+      try {
+        const response = await deleteAllProductsMutation.mutateAsync()
+        setSelectedProducts([])
+        setSelectAll(false)
+        showNotificationModal('success', response.message || 'تم حذف جميع المنتجات بنجاح')
+      } catch (error) {
+        console.error('خطأ في حذف جميع المنتجات:', error)
+        // Check if it's a sales relationship error
+        if (error.message && error.message.includes('مرتبط بمبيعات')) {
+          showNotificationModal('error', error.message)
+        } else {
+          showNotificationModal('error', 'تعذر حذف جميع المنتجات، من فضلك حاول لاحقاً')
+        }
       }
     }
   }
@@ -138,7 +174,8 @@ export default function ProductsPage() {
       quantity: product.quantity.toString(),
       price: product.price.toString(),
       reference_number: product.reference_number || '',
-      image_url: product.image_url || ''
+      image_url: product.image_url || '',
+      category_id: product.category_id || ''
     })
     setShowAddModal(true)
   }
@@ -150,7 +187,8 @@ export default function ProductsPage() {
       quantity: '',
       price: '',
       reference_number: '',
-      image_url: ''
+      image_url: '',
+      category_id: ''
     })
   }
 
@@ -368,19 +406,37 @@ export default function ProductsPage() {
     }
   }
 
-  const totalPages = Math.ceil(products.length / productsPerPage)
+  const totalPages = Math.ceil(totalCount / productsPerPage)
 
   return (
     <div className="w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">إدارة المنتجات</h1>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center w-full sm:w-auto justify-center"
-        >
-          <Plus className="w-5 h-5 ml-2" />
-          إضافة منتج جديد
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          {selectedProducts.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center justify-center"
+            >
+              <Trash className="w-4 h-4 ml-2" />
+              حذف المحدد ({selectedProducts.length})
+            </button>
+          )}
+          <button
+            onClick={handleDeleteAll}
+            className="bg-red-800 hover:bg-red-900 text-white px-4 py-2 rounded-lg flex items-center justify-center"
+          >
+            <Trash2 className="w-4 h-4 ml-2" />
+            حذف الكل
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center"
+          >
+            <Plus className="w-5 h-5 ml-2" />
+            إضافة منتج جديد
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -404,10 +460,21 @@ export default function ProductsPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleSelectAll}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                </th>
+                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   الصورة
                 </th>
                 <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   اسم المنتج
+                </th>
+                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                  الفئة
                 </th>
                 <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   الكمية
@@ -426,19 +493,27 @@ export default function ProductsPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="px-3 sm:px-6 py-4 text-center text-gray-500">
+                  <td colSpan="8" className="px-3 sm:px-6 py-4 text-center text-gray-500">
                     جاري التحميل...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-3 sm:px-6 py-4 text-center text-gray-500">
+                  <td colSpan="8" className="px-3 sm:px-6 py-4 text-center text-gray-500">
                     لا توجد منتجات
                   </td>
                 </tr>
               ) : (
                 products.map((product) => (
-                  <tr key={product.id}>
+                  <tr key={product.id} className={selectedProducts.includes(product.id) ? 'bg-blue-50' : ''}>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.includes(product.id)}
+                        onChange={() => handleSelectProduct(product.id)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       {product.image_url ? (
                         <img
@@ -459,14 +534,31 @@ export default function ProductsPage() {
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                        <div className="text-sm font-medium text-gray-900 flex items-center">
+                          {product.name}
+                          {product.sales_count > 0 && (
+                            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {product.sales_count} مبيعة
+                            </span>
+                          )}
+                        </div>
                         {product.description && (
                           <div className="text-sm text-gray-500 hidden sm:block">{product.description}</div>
                         )}
                         <div className="text-xs text-gray-500 sm:hidden">
                           {product.reference_number && `المرجع: ${product.reference_number}`}
+                          {product.category && ` | الفئة: ${product.category.name}`}
                         </div>
                       </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden sm:table-cell">
+                      {product.category ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {product.category.name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">بدون فئة</span>
+                      )}
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {product.quantity.toLocaleString('en-US')}
@@ -580,6 +672,24 @@ export default function ProductsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows="3"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  الفئة (اختياري)
+                </label>
+                <select
+                  value={formData.category_id}
+                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">اختر فئة</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

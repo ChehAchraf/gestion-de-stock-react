@@ -14,6 +14,7 @@
     "@hookform/resolvers": "^5.2.1",
     "@supabase/supabase-js": "^2.56.1",
     "@tailwindcss/vite": "^4.1.12",
+    "@tanstack/react-query": "^5.87.1",
     "@zxing/library": "^0.21.3",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.542.0",

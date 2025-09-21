@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Plus, Search, ShoppingCart, X, Image as ImageIcon, Edit, Trash2, CheckCircle, AlertCircle } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { useSales, useProductsForSales, useCreateSale, useUpdateSale, useDeleteSale } from '../hooks/useLaravelApi'
+import { useDebounce } from '../hooks/useDebounce'
+
 
 export default function SalesPage() {
-  const [products, setProducts] = useState([])
-  const [sales, setSales] = useState([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -15,17 +14,23 @@ export default function SalesPage() {
   const [salePrice, setSalePrice] = useState('')
   const [editingSale, setEditingSale] = useState(null)
   const [productSearchTerm, setProductSearchTerm] = useState('')
-  const [filteredProducts, setFilteredProducts] = useState([])
   const [showNotification, setShowNotification] = useState(false)
   const [notificationType, setNotificationType] = useState('success') // 'success' or 'error'
   const [notificationMessage, setNotificationMessage] = useState('')
   
   const salesPerPage = 8
-
-  useEffect(() => {
-    fetchProducts()
-    fetchSales()
-  }, [currentPage, searchTerm])
+  const debouncedProductSearchTerm = useDebounce(productSearchTerm, 300)
+  
+  // Use Laravel API hooks
+  const { data: salesData, isLoading: salesLoading } = useSales(currentPage, salesPerPage)
+  const { data: products = [] } = useProductsForSales()
+  const createSaleMutation = useCreateSale()
+  const updateSaleMutation = useUpdateSale()
+  const deleteSaleMutation = useDeleteSale()
+  
+  const sales = salesData?.data || []
+  const totalCount = salesData?.totalCount || 0
+  const loading = salesLoading
 
   // إخفاء الإشعار تلقائياً بعد 3 ثوان
   useEffect(() => {
@@ -43,66 +48,11 @@ export default function SalesPage() {
     setShowNotification(true)
   }
 
-  useEffect(() => {
-    // تصفية المنتجات بناءً على مصطلح البحث
-    if (productSearchTerm.trim() === '') {
-      setFilteredProducts(products)
-    } else {
-      const filtered = products.filter(product =>
-        product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-        (product.reference_number && product.reference_number.toLowerCase().includes(productSearchTerm.toLowerCase()))
-      )
-      setFilteredProducts(filtered)
-    }
-  }, [products, productSearchTerm])
-
-  const fetchProducts = async () => {
-    try {
-      let query = supabase
-        .from('products')
-        .select('*')
-        .gt('quantity', 0)
-        .order('name')
-
-      if (searchTerm) {
-        query = query.or(`name.ilike.%${searchTerm}%,reference_number.ilike.%${searchTerm}%`)
-      }
-
-      const { data, error } = await query
-      if (error) throw error
-      setProducts(data || [])
-    } catch (error) {
-      console.error('خطأ في جلب المنتجات:', error)
-    }
-  }
-
-  const fetchSales = async () => {
-    try {
-      setLoading(true)
-      let query = supabase
-        .from('sales')
-        .select(`
-          *,
-          products (
-            name,
-            reference_number,
-            image_url
-          )
-        `)
-        .order('created_at', { ascending: false })
-
-      const from = (currentPage - 1) * salesPerPage
-      const to = from + salesPerPage - 1
-
-      const { data, error } = await query.range(from, to)
-      if (error) throw error
-      setSales(data || [])
-    } catch (error) {
-      console.error('خطأ في جلب المبيعات:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Filter products based on search term
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(debouncedProductSearchTerm.toLowerCase()) ||
+    (product.reference_number && product.reference_number.toLowerCase().includes(debouncedProductSearchTerm.toLowerCase()))
+  )
 
   const handleProductSelect = (product) => {
     setSelectedProduct(product)
@@ -124,34 +74,20 @@ export default function SalesPage() {
     }
 
     try {
-      // إضافة المبيعات
-      const { error: saleError } = await supabase
-        .from('sales')
-        .insert([{
-          product_id: selectedProduct.id,
-          quantity: quantity,
-          unit_price: price,
-          total_price: totalPrice
-        }])
+      const saleData = {
+        product_id: selectedProduct.id,
+        quantity: quantity,
+        unit_price: price,
+        total_price: totalPrice
+      }
 
-      if (saleError) throw saleError
-
-      // تحديث كمية المنتج
-      const newQuantity = selectedProduct.quantity - quantity
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({ quantity: newQuantity })
-        .eq('id', selectedProduct.id)
-
-      if (updateError) throw updateError
+      await createSaleMutation.mutateAsync(saleData)
 
       setShowAddModal(false)
       setSelectedProduct(null)
       setSaleQuantity('')
       setSalePrice('')
       setProductSearchTerm('')
-      fetchProducts()
-      fetchSales()
       showNotificationModal('success', 'تمت إضافة المبيعة بنجاح')
     } catch (error) {
       console.error('خطأ في تسجيل المبيعات:', error)
@@ -161,7 +97,7 @@ export default function SalesPage() {
 
   const handleEditSale = (sale) => {
     setEditingSale(sale)
-    setSelectedProduct(sale.products)
+    setSelectedProduct(sale.product)
     setSaleQuantity(sale.quantity.toString())
     setSalePrice(sale.unit_price.toString())
     setShowEditModal(true)
@@ -186,34 +122,23 @@ export default function SalesPage() {
     }
 
     try {
-      // تحديث المبيعات
-      const { error: saleError } = await supabase
-        .from('sales')
-        .update({
-          quantity: quantity,
-          unit_price: price,
-          total_price: totalPrice
-        })
-        .eq('id', editingSale.id)
+      const saleData = {
+        product_id: selectedProduct.id,
+        quantity: quantity,
+        unit_price: price,
+        total_price: totalPrice
+      }
 
-      if (saleError) throw saleError
-
-      // تحديث كمية المنتج
-      const newQuantity = currentProduct.quantity - quantityDifference
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({ quantity: newQuantity })
-        .eq('id', selectedProduct.id)
-
-      if (updateError) throw updateError
+      await updateSaleMutation.mutateAsync({
+        id: editingSale.id,
+        ...saleData
+      })
 
       setShowEditModal(false)
       setEditingSale(null)
       setSelectedProduct(null)
       setSaleQuantity('')
       setSalePrice('')
-      fetchProducts()
-      fetchSales()
       showNotificationModal('success', 'تم تحديث المبيعة بنجاح')
     } catch (error) {
       console.error('خطأ في تحديث المبيعات:', error)
@@ -225,28 +150,8 @@ export default function SalesPage() {
     if (!window.confirm('هل أنت متأكد من حذف هذه المبيعات؟')) return
 
     try {
-      // حذف المبيعات
-      const { error: saleError } = await supabase
-        .from('sales')
-        .delete()
-        .eq('id', sale.id)
+      await deleteSaleMutation.mutateAsync(sale.id)
 
-      if (saleError) throw saleError
-
-      // إعادة الكمية إلى المخزون
-      const currentProduct = products.find(p => p.id === sale.product_id)
-      if (currentProduct) {
-        const newQuantity = currentProduct.quantity + sale.quantity
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({ quantity: newQuantity })
-          .eq('id', sale.product_id)
-
-        if (updateError) throw updateError
-      }
-
-      fetchProducts()
-      fetchSales()
       showNotificationModal('success', 'تم حذف المبيعة بنجاح')
     } catch (error) {
       console.error('خطأ في حذف المبيعات:', error)
@@ -254,7 +159,7 @@ export default function SalesPage() {
     }
   }
 
-  const totalPages = Math.ceil(sales.length / salesPerPage)
+  const totalPages = Math.ceil(totalCount / salesPerPage)
 
   return (
     <div>
@@ -285,7 +190,8 @@ export default function SalesPage() {
 
       {/* Sales Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -328,10 +234,10 @@ export default function SalesPage() {
               sales.map((sale) => (
                 <tr key={sale.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {sale.products?.image_url ? (
+                    {sale.product?.image_url ? (
                       <img
-                        src={sale.products.image_url}
-                        alt={sale.products?.name || 'منتج محذوف'}
+                        src={sale.product.image_url}
+                        alt={sale.product?.name || 'منتج محذوف'}
                         className="w-12 h-12 rounded-lg object-cover"
                         onError={(e) => {
                           e.target.style.display = 'none'
@@ -339,7 +245,7 @@ export default function SalesPage() {
                         }}
                       />
                     ) : null}
-                    {!sale.products?.image_url && (
+                    {!sale.product?.image_url && (
                       <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                         <ImageIcon className="w-6 h-6 text-gray-400" />
                       </div>
@@ -348,11 +254,11 @@ export default function SalesPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {sale.products?.name || 'منتج محذوف'}
+                        {sale.product?.name || 'منتج محذوف'}
                       </div>
-                      {sale.products?.reference_number && (
+                      {sale.product?.reference_number && (
                         <div className="text-sm text-gray-500">
-                          {sale.products.reference_number}
+                          {sale.product.reference_number}
                         </div>
                       )}
                     </div>
@@ -389,7 +295,8 @@ export default function SalesPage() {
               ))
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
       {/* Pagination */}

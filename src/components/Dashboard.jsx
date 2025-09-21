@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useUser, SignOutButton } from '@clerk/clerk-react'
-import { Home, Package, ShoppingCart, BarChart3, LogOut, Menu, X } from 'lucide-react'
+import { Home, Package, ShoppingCart, BarChart3, LogOut, Menu, X, Tag } from 'lucide-react'
 import HomePage from './HomePage'
 import ProductsPage from './ProductsPage'
 import SalesPage from './SalesPage'
 import ReportsPage from './ReportsPage'
+import CategoriesPage from './CategoriesPage'
 
 export default function Dashboard() {
   const { user } = useUser()
@@ -14,6 +15,7 @@ export default function Dashboard() {
   const menuItems = [
     { id: 'home', label: 'الرئيسية', icon: Home },
     { id: 'products', label: 'المنتجات', icon: Package },
+    { id: 'categories', label: 'الفئات', icon: Tag },
     { id: 'sales', label: 'المبيعات', icon: ShoppingCart },
     { id: 'reports', label: 'التقارير', icon: BarChart3 },
   ]
@@ -33,6 +35,8 @@ export default function Dashboard() {
         return <HomePage onNavigate={handleNavigate} />
       case 'products':
         return <ProductsPage />
+      case 'categories':
+        return <CategoriesPage />
       case 'sales':
         return <SalesPage />
       case 'reports':
